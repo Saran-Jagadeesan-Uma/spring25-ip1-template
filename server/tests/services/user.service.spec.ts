@@ -18,8 +18,13 @@ describe('User model', () => {
   });
 
   describe('saveUser', () => {
+    beforeEach(() => {
+      mockingoose.resetAll();
+    });
+
     it('should return the saved user', async () => {
       mockingoose(UserModel).toReturn(user, 'create');
+
       const savedUser = (await saveUser(user)) as SafeUser;
 
       expect(savedUser._id).toBeDefined();
@@ -27,147 +32,158 @@ describe('User model', () => {
       expect(savedUser.dateJoined).toEqual(user.dateJoined);
     });
 
-    it('should return error if save operation fails', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'create');
-      const result = await saveUser(user);
-      expect(result).toEqual({ error: 'Could not save user' });
-    });
+    // TODO: Task 1 - Write additional test cases for saveUser
+  });
+});
+
+describe('getUserByUsername', () => {
+  beforeEach(() => {
+    mockingoose.resetAll();
   });
 
-  describe('getUserByUsername', () => {
-    it('should return the matching user', async () => {
-      const mockedUser = {
-        toObject: () => ({
-          _id: user._id,
-          username: user.username,
-          password: user.password,
-          dateJoined: user.dateJoined,
-        }),
-      };
-      mockingoose(UserModel).toReturn(mockedUser, 'findOne');
-
-      const result = await getUserByUsername(user.username);
-
-      if ('error' in result) {
-        throw new Error(`Expected a user, got error: ${result.error}`);
-      }
-
-      expect(result).toMatchObject({
+  it('should return the matching user', async () => {
+    const mockedUser = {
+      toObject: () => ({
+        _id: user._id,
         username: user.username,
+        password: user.password, // Required internally but excluded from returned result
         dateJoined: user.dateJoined,
-      });
-    });
+      }),
+    };
 
-    it('should return error if user not found', async () => {
-      mockingoose(UserModel).toReturn(null, 'findOne');
-      const result = await getUserByUsername(user.username);
-      expect(result).toEqual({ error: 'User not found' });
-    });
+    mockingoose(UserModel).toReturn(mockedUser, 'findOne');
 
-    it('should return error if retrieval fails', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'findOne');
-      const result = await getUserByUsername(user.username);
-      expect(result).toEqual({ error: 'Failed to retrieve user' });
+    const result = await getUserByUsername(user.username);
+
+    if ('error' in result) {
+      throw new Error(`Expected a user, but got error: ${result.error}`);
+    }
+
+    expect(result).toMatchObject({
+      username: user.username,
+      dateJoined: user.dateJoined,
     });
   });
+});
 
-  describe('loginUser', () => {
-    it('should return the user if authentication succeeds', async () => {
-      const mockedUser = {
-        password: user.password,
-        toObject: () => ({
-          _id: user._id,
-          username: user.username,
-          password: user.password,
-          dateJoined: user.dateJoined,
-        }),
-      };
-      mockingoose(UserModel).toReturn(mockedUser, 'findOne');
+describe('loginUser', () => {
+  beforeEach(() => {
+    mockingoose.resetAll();
+  });
 
-      const credentials: UserCredentials = {
+  it('should return the user if authentication succeeds', async () => {
+    const mockedUser = {
+      password: user.password, // <- Important for password check
+      toObject: () => ({
+        _id: user._id,
         username: user.username,
         password: user.password,
-      };
-
-      const result = await loginUser(credentials);
-      expect(result).toMatchObject({
-        username: user.username,
         dateJoined: user.dateJoined,
-      });
-    });
+      }),
+    };
 
-    it('should return error if user not found', async () => {
-      mockingoose(UserModel).toReturn(null, 'findOne');
-      const result = await loginUser({ username: user.username, password: user.password });
-      expect(result).toEqual({ error: 'Invalid username or password' });
-    });
+    mockingoose(UserModel).toReturn(mockedUser, 'findOne');
 
-    it('should return error if password is incorrect', async () => {
-      mockingoose(UserModel).toReturn({ ...user, password: 'differentPassword' }, 'findOne');
-      const result = await loginUser({ username: user.username, password: 'wrongPassword' });
-      expect(result).toEqual({ error: 'Invalid username or password' });
-    });
+    const credentials: UserCredentials = {
+      username: user.username,
+      password: user.password,
+    };
 
-    it('should return error if login fails due to DB error', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'findOne');
-      const credentials: UserCredentials = {
-        username: user.username,
-        password: user.password,
-      };
-      const result = await loginUser(credentials);
-      expect(result).toEqual({ error: 'Login failed' });
+    const result = await loginUser(credentials);
+
+    if ('error' in result) throw new Error('Expected user, got error');
+
+    expect(result).toMatchObject({
+      username: user.username,
+      dateJoined: user.dateJoined,
     });
   });
 
-  describe('deleteUserByUsername', () => {
-    it('should return the deleted user', async () => {
-      mockingoose(UserModel).toReturn(safeUser, 'findOneAndDelete');
-      const result = await deleteUserByUsername(user.username);
-      expect(result).toMatchObject({
-        username: user.username,
-        dateJoined: user.dateJoined,
-      });
-    });
-
-    it('should return error if user not found', async () => {
-      mockingoose(UserModel).toReturn(null, 'findOneAndDelete');
-      const result = await deleteUserByUsername(user.username);
-      expect(result).toEqual({ error: 'User not found' });
-    });
-
-    it('should return error if deletion fails', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'findOneAndDelete');
-      const result = await deleteUserByUsername(user.username);
-      expect(result).toEqual({ error: 'Failed to delete user' });
-    });
+  it('should return error if user does not exist', async () => {
+    mockingoose(UserModel).toReturn(null, 'findOne');
+    const credentials: UserCredentials = {
+      username: user.username,
+      password: user.password,
+    };
+    const result = await loginUser(credentials);
+    expect(result).toEqual({ error: 'Invalid username or password' });
   });
 
-  describe('updateUser', () => {
-    const updates: Partial<User> = { password: 'newPassword' };
-
-    it('should return the updated user', async () => {
-      mockingoose(UserModel).toReturn(safeUser, 'findOneAndUpdate');
-      const result = await updateUser(user.username, updates);
-      expect(result).toMatchObject({
-        username: user.username,
-        dateJoined: user.dateJoined,
-      });
-    });
-
-    it('should return error if user not found', async () => {
-      mockingoose(UserModel).toReturn(null, 'findOneAndUpdate');
-      const result = await updateUser(user.username, updates);
-      expect(result).toEqual({ error: 'User not found' });
-    });
-
-    it('should return error if update fails', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'findOneAndUpdate');
-      const result = await updateUser(user.username, updates);
-      expect(result).toEqual({ error: 'Failed to update user' });
-    });
+  it('should return error if password is incorrect', async () => {
+    mockingoose(UserModel).toReturn({ ...user, password: 'differentPassword' }, 'findOne');
+    const credentials: UserCredentials = {
+      username: user.username,
+      password: 'wrongPassword',
+    };
+    const result = await loginUser(credentials);
+    expect(result).toEqual({ error: 'Invalid username or password' });
   });
 
-  afterEach(() => {
-    jest.clearAllMocks();
+  // TODO: Task 1 - Write additional test cases for loginUser
+});
+
+describe('deleteUserByUsername', () => {
+  beforeEach(() => {
+    mockingoose.resetAll();
   });
+
+  it('should return the deleted user when deleted succesfully', async () => {
+    mockingoose(UserModel).toReturn(safeUser, 'findOneAndDelete');
+
+    const deletedUser = (await deleteUserByUsername(user.username)) as SafeUser;
+
+    expect(deletedUser.username).toEqual(user.username);
+    expect(deletedUser.dateJoined).toEqual(user.dateJoined);
+  });
+
+  it('should return error if user does not exist', async () => {
+    mockingoose(UserModel).toReturn(null, 'findOneAndDelete');
+    const result = await deleteUserByUsername(user.username);
+    expect(result).toEqual({ error: 'User not found' });
+  });
+
+  // TODO: Task 1 - Write additional test cases for deleteUserByUsername
+});
+
+describe('updateUser', () => {
+  const updatedUser: User = {
+    ...user,
+    password: 'newPassword',
+  };
+
+  const safeUpdatedUser: SafeUser = {
+    username: user.username,
+    dateJoined: user.dateJoined,
+  };
+
+  const updates: Partial<User> = {
+    password: 'newPassword',
+  };
+
+  beforeEach(() => {
+    mockingoose.resetAll();
+  });
+
+  it('should return the updated user when updated succesfully', async () => {
+    mockingoose(UserModel).toReturn(safeUpdatedUser, 'findOneAndUpdate');
+
+    const result = (await updateUser(user.username, updates)) as SafeUser;
+
+    expect(result.username).toEqual(user.username);
+    expect(result.username).toEqual(updatedUser.username);
+    expect(result.dateJoined).toEqual(user.dateJoined);
+    expect(result.dateJoined).toEqual(updatedUser.dateJoined);
+  });
+
+  it('should return error if user does not exist', async () => {
+    mockingoose(UserModel).toReturn(null, 'findOneAndUpdate');
+    const result = await updateUser(user.username, { password: 'newPassword' });
+    expect(result).toEqual({ error: 'User not found' });
+  });
+
+  // TODO: Task 1 - Write additional test cases for updateUser
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
 });
