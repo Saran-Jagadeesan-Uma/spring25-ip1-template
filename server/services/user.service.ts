@@ -7,7 +7,7 @@ import { User, UserCredentials, UserResponse, SafeUser } from '../types/types';
 export const saveUser = async (user: User): Promise<UserResponse> => {
   try {
     const createdUser = await UserModel.create(user);
-    const { password, ...safeUser } = createdUser.toObject();
+    const { password: _password, ...safeUser } = createdUser.toObject();
     return safeUser as SafeUser;
   } catch (error) {
     return { error: 'Could not save user' };
