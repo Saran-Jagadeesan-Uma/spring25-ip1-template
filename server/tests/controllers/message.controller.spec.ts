@@ -7,7 +7,7 @@ const saveMessageSpy = jest.spyOn(util, 'saveMessage');
 const getMessagesSpy = jest.spyOn(util, 'getMessages');
 
 describe('POST /addMessage', () => {
-  it('should add a new message', async () => {
+  it('should add new message', async () => {
     const validId = new mongoose.Types.ObjectId();
     const message = {
       _id: validId,
@@ -22,7 +22,7 @@ describe('POST /addMessage', () => {
       .post('/messaging/addMessage')
       .send({ messageToAdd: message });
 
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(201);
     expect(response.body).toEqual({
       _id: message._id.toString(),
       msg: message.msg,
@@ -31,14 +31,61 @@ describe('POST /addMessage', () => {
     });
   });
 
-  it('should return bad request error if messageToAdd is missing', async () => {
+  it('should return bad request error if messageToAddss missing', async () => {
     const response = await supertest(app).post('/messaging/addMessage').send({});
-
     expect(response.status).toBe(400);
-    expect(response.text).toBe('Invalid request');
+    expect(response.body).toEqual({ error: 'Invalid message request' });
   });
 
-  // TODO: Task 2 - Write additional test cases for addMessageRoute
+  it('should return 400 if msg missing', async () => {
+    const message = {
+      msgFrom: 'User1',
+      msgDateTime: new Date('2024-06-04'),
+    };
+    const response = await supertest(app)
+      .post('/messaging/addMessage')
+      .send({ messageToAdd: message });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Invalid message request' });
+  });
+
+  it('should return 400 if msgFrom missing', async () => {
+    const message = {
+      msg: 'Hello',
+      msgDateTime: new Date('2024-06-04'),
+    };
+    const response = await supertest(app)
+      .post('/messaging/addMessage')
+      .send({ messageToAdd: message });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Invalid message request' });
+  });
+
+  it('should return 400 if msgDateTime missing', async () => {
+    const message = {
+      msg: 'Hello',
+      msgFrom: 'User1',
+    };
+    const response = await supertest(app)
+      .post('/messaging/addMessage')
+      .send({ messageToAdd: message });
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ error: 'Invalid message request' });
+  });
+
+  it('should return 500 if saveMessage returns error', async () => {
+    const message = {
+      msg: 'Hello',
+      msgFrom: 'User1',
+      msgDateTime: new Date('2024-06-04'),
+    };
+    saveMessageSpy.mockResolvedValueOnce({ error: 'Error saving message' });
+    const response = await supertest(app)
+      .post('/messaging/addMessage')
+      .send({ messageToAdd: message });
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({ error: 'Error saving message' });
+  });
 });
 
 describe('GET /getMessages', () => {

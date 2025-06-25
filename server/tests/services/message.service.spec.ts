@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import MessageModel from '../../models/messages.model';
 import { getMessages, saveMessage } from '../../services/message.service';
 
@@ -26,24 +27,41 @@ describe('Message model', () => {
       mockingoose.resetAll();
     });
 
-    it('should return the saved message', async () => {
+    it('should return saved message', async () => {
       mockingoose(MessageModel).toReturn(message1, 'create');
 
       const savedMessage = await saveMessage(message1);
 
       expect(savedMessage).toMatchObject(message1);
     });
-    // TODO: Task 2 - Write a test case for saveMessage when an error occurs
+
+    it('should return an error if saving fails', async () => {
+      jest.spyOn(MessageModel, 'create').mockImplementationOnce(() => {
+        throw new Error('DB error');
+      });
+
+      const result = await saveMessage(message1);
+      expect(result).toEqual({ error: 'Error saving message' });
+    });
   });
 
   describe('getMessages', () => {
-    it('should return all messages, sorted by date', async () => {
-      mockingoose(MessageModel).toReturn([message2, message1], 'find');
+    it('should return all sorted messages', async () => {
+      const message1WithId = { ...message1, _id: new mongoose.Types.ObjectId() };
+      const message2WithId = { ...message2, _id: new mongoose.Types.ObjectId() };
+      mockingoose(MessageModel).toReturn([message1WithId, message2WithId], 'find');
+      const messages = await getMessages();
+      expect(messages[0]).toMatchObject(message1);
+      expect(messages[1]).toMatchObject(message2);
+    });
+
+    it('should return an empty array incase of an error', async () => {
+      jest.spyOn(MessageModel, 'find').mockImplementationOnce(() => {
+        throw new Error('DB error');
+      });
 
       const messages = await getMessages();
-
-      expect(messages).toMatchObject([message1, message2]);
+      expect(messages).toEqual([]);
     });
-    // TODO: Task 2 - Write a test case for getMessages when an error occurs
   });
 });

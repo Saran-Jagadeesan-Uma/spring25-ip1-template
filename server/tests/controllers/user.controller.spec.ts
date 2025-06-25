@@ -23,14 +23,22 @@ const mockUserJSONResponse = {
   dateJoined: new Date('2024-12-03').toISOString(),
 };
 
-const saveUserSpy = jest.spyOn(util, 'saveUser');
-const loginUserSpy = jest.spyOn(util, 'loginUser');
-const updatedUserSpy = jest.spyOn(util, 'updateUser');
-const getUserByUsernameSpy = jest.spyOn(util, 'getUserByUsername');
-const deleteUserByUsernameSpy = jest.spyOn(util, 'deleteUserByUsername');
+afterAll(async () => {
+  await mongoose.disconnect();
+});
 
 describe('Test userController', () => {
-  describe('POST /signup', () => {
+  describe('POST /register', () => {
+    let saveUserSpy: jest.SpiedFunction<typeof util.saveUser>;
+
+    beforeEach(() => {
+      saveUserSpy = jest.spyOn(util, 'saveUser');
+    });
+
+    afterEach(() => {
+      saveUserSpy.mockRestore();
+    });
+
     it('should create a new user given correct arguments', async () => {
       const mockReqBody = {
         username: mockUser.username,
@@ -39,214 +47,227 @@ describe('Test userController', () => {
 
       saveUserSpy.mockResolvedValueOnce(mockSafeUser);
 
-      const response = await supertest(app).post('/user/signup').send(mockReqBody);
+      const response = await supertest(app).post('/user/register').send(mockReqBody);
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(201);
       expect(response.body).toEqual(mockUserJSONResponse);
       expect(saveUserSpy).toHaveBeenCalledWith({ ...mockReqBody, dateJoined: expect.any(Date) });
     });
 
     it('should return 400 for request missing username', async () => {
-      const mockReqBody = {
-        password: mockUser.password,
-      };
-
-      const response = await supertest(app).post('/user/signup').send(mockReqBody);
-
+      const response = await supertest(app).post('/user/register').send({ password: 'test' });
       expect(response.status).toBe(400);
-      expect(response.text).toEqual('Invalid user body');
-    });
-    it('should return 400 for missing password', async () => {
-      const response = await supertest(app).post('/user/signup').send({ username: 'abc' });
-
-      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
-    it('should return 400 if user already exists', async () => {
-      saveUserSpy.mockResolvedValueOnce({ error: 'User exists' });
+    it('should return 400 for request missing password', async () => {
+      const response = await supertest(app).post('/user/register').send({ username: 'test' });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid user body' });
+    });
 
-      const response = await supertest(app).post('/user/signup').send({
+    it('should return 409 if username already exists', async () => {
+      saveUserSpy.mockResolvedValueOnce({ error: 'Username already exists' });
+      const response = await supertest(app).post('/user/register').send({
         username: mockUser.username,
         password: mockUser.password,
       });
+      expect(response.status).toBe(409);
+      expect(response.body).toEqual({ error: 'Username already exists' });
+    });
 
-      expect(response.status).toBe(400);
-      expect(response.body).toEqual({ error: 'User exists' });
+    it('should return 500 if saving user fails', async () => {
+      saveUserSpy.mockResolvedValueOnce({ error: 'Could not save user' });
+      const response = await supertest(app).post('/user/register').send({
+        username: mockUser.username,
+        password: mockUser.password,
+      });
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Could not save user' });
     });
   });
 
   describe('POST /login', () => {
-    it('should succesfully login for a user given correct arguments', async () => {
-      const mockReqBody = {
-        username: mockUser.username,
-        password: mockUser.password,
-      };
+    let loginUserSpy: jest.SpiedFunction<typeof util.loginUser>;
 
-      loginUserSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).post('/user/login').send(mockReqBody);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockUserJSONResponse);
-      expect(loginUserSpy).toHaveBeenCalledWith(mockReqBody);
+    beforeEach(() => {
+      loginUserSpy = jest.spyOn(util, 'loginUser');
     });
 
-    it('should return 400 for request missing username', async () => {
-      const mockReqBody = {
+    afterEach(() => {
+      loginUserSpy.mockRestore();
+    });
+
+    it('should login successfully with correct credentials', async () => {
+      loginUserSpy.mockResolvedValueOnce(mockSafeUser);
+      const response = await supertest(app).post('/user/login').send({
+        username: mockUser.username,
         password: mockUser.password,
-      };
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockUserJSONResponse);
+    });
 
-      const response = await supertest(app).post('/user/login').send(mockReqBody);
-
+    it('should return 400 if username is missing', async () => {
+      const response = await supertest(app).post('/user/login').send({ password: '123' });
       expect(response.status).toBe(400);
-      expect(response.text).toEqual('Invalid user body');
+      expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
-    it('should login successfully', async () => {
-      loginUserSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).post('/user/login').send({
-        username: mockUser.username,
-        password: mockUser.password,
-      });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockUserJSONResponse);
+    it('should return 400 if password is missing', async () => {
+      const response = await supertest(app).post('/user/login').send({ username: 'test' });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
-    it('should return 401 if login fails', async () => {
-      loginUserSpy.mockResolvedValueOnce({ error: 'Invalid credentials' });
-
+    it('should return 401 if credentials are incorrect', async () => {
+      loginUserSpy.mockResolvedValueOnce({ error: 'Invalid username or password' });
       const response = await supertest(app).post('/user/login').send({
-        username: mockUser.username,
-        password: 'wrong',
+        username: 'wronguser',
+        password: 'wrongpass',
       });
-
       expect(response.status).toBe(401);
-      expect(response.body).toEqual({ error: 'Invalid credentials' });
+      expect(response.body).toEqual({ error: 'Invalid username or password' });
+    });
+
+    it('should return 500 if login fails due to server error', async () => {
+      loginUserSpy.mockResolvedValueOnce({ error: 'Login failed' });
+      const response = await supertest(app).post('/user/login').send({
+        username: mockUser.username,
+        password: mockUser.password,
+      });
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Login failed' });
     });
   });
 
-  describe('PATCH /resetPassword', () => {
-    it('should succesfully return updated user object given correct arguments', async () => {
-      const mockReqBody = {
-        username: mockUser.username,
-        password: 'newPassword',
-      };
+  describe('PATCH /reset-password', () => {
+    let updateUserSpy: jest.SpiedFunction<typeof util.updateUser>;
 
-      updatedUserSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).patch('/user/resetPassword').send(mockReqBody);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual({ ...mockUserJSONResponse });
-      expect(updatedUserSpy).toHaveBeenCalledWith(mockUser.username, { password: 'newPassword' });
+    beforeEach(() => {
+      updateUserSpy = jest.spyOn(util, 'updateUser');
     });
 
-    it('should return 400 for request missing username', async () => {
-      const mockReqBody = {
-        password: 'newPassword',
-      };
+    afterEach(() => {
+      updateUserSpy.mockRestore();
+    });
 
-      const response = await supertest(app).patch('/user/resetPassword').send(mockReqBody);
+    it('should return updated user given valid data', async () => {
+      updateUserSpy.mockResolvedValueOnce(mockSafeUser);
+      const response = await supertest(app).patch('/user/reset-password').send({
+        username: mockUser.username,
+        password: 'newpass',
+      });
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual(mockUserJSONResponse);
+    });
 
+    it('should return 400 if username is missing', async () => {
+      const response = await supertest(app).patch('/user/reset-password').send({ password: 'newpass' });
       expect(response.status).toBe(400);
-      expect(response.text).toEqual('Invalid user body');
+      expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
-    it('should update the user password', async () => {
-      updatedUserSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).patch('/user/resetPassword').send({
-        username: mockUser.username,
-        password: 'newPass',
-      });
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockUserJSONResponse);
+    it('should return 400 if password is missing', async () => {
+      const response = await supertest(app).patch('/user/reset-password').send({ username: 'user1' });
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
-    it('should return 404 if update fails', async () => {
-      updatedUserSpy.mockResolvedValueOnce({ error: 'User not found' });
-
-      const response = await supertest(app).patch('/user/resetPassword').send({
-        username: mockUser.username,
-        password: 'newPass',
+    it('should return 404 if user not found', async () => {
+      updateUserSpy.mockResolvedValueOnce({ error: 'User not found' });
+      const response = await supertest(app).patch('/user/reset-password').send({
+        username: 'nonexistent',
+        password: 'pass',
       });
-
       expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'User not found' });
+    });
+
+    it('should return 500 if update fails', async () => {
+      updateUserSpy.mockResolvedValueOnce({ error: 'Failed to update user' });
+      const response = await supertest(app).patch('/user/reset-password').send({
+        username: mockUser.username,
+        password: 'newpass',
+      });
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to update user' });
     });
   });
 
-  describe('GET /getUser', () => {
-    it('should return the user given correct arguments', async () => {
-      getUserByUsernameSpy.mockResolvedValueOnce(mockSafeUser);
+  describe('GET /:username', () => {
+    let getUserSpy: jest.SpiedFunction<typeof util.getUserByUsername>;
 
-      const response = await supertest(app).get(`/user/getUser/${mockUser.username}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockUserJSONResponse);
-      expect(getUserByUsernameSpy).toHaveBeenCalledWith(mockUser.username);
+    beforeEach(() => {
+      getUserSpy = jest.spyOn(util, 'getUserByUsername');
     });
 
-    it('should return 404 if username not provided', async () => {
-      // Express automatically returns 404 for missing parameters when
-      // defined as required in the route
-      const response = await supertest(app).get('/user/getUser/');
-      expect(response.status).toBe(404);
+    afterEach(() => {
+      getUserSpy.mockRestore();
     });
 
-    it('should return user data', async () => {
-      getUserByUsernameSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).get(`/user/getUser/${mockUser.username}`);
-
+    it('should return user if found', async () => {
+      getUserSpy.mockResolvedValueOnce(mockSafeUser);
+      const response = await supertest(app).get(`/user/${mockUser.username}`);
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockUserJSONResponse);
     });
 
     it('should return 404 if user not found', async () => {
-      getUserByUsernameSpy.mockResolvedValueOnce({ error: 'User not found' });
-
-      const response = await supertest(app).get(`/user/getUser/${mockUser.username}`);
-
+      getUserSpy.mockResolvedValueOnce({ error: 'User not found' });
+      const response = await supertest(app).get(`/user/ghost`);
       expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'User not found' });
+    });
+
+    it('should return 500 if error retrieving user', async () => {
+      getUserSpy.mockResolvedValueOnce({ error: 'Failed to retrieve user' });
+      const response = await supertest(app).get(`/user/${mockUser.username}`);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to retrieve user' });
     });
   });
 
-  describe('DELETE /deleteUser', () => {
-    it('should return the deleted user given correct arguments', async () => {
-      deleteUserByUsernameSpy.mockResolvedValueOnce(mockSafeUser);
+  describe('DELETE /:username', () => {
+    let deleteUserSpy: jest.SpiedFunction<typeof util.deleteUserByUsername>;
 
-      const response = await supertest(app).delete(`/user/deleteUser/${mockUser.username}`);
-
-      expect(response.status).toBe(200);
-      expect(response.body).toEqual(mockUserJSONResponse);
-      expect(deleteUserByUsernameSpy).toHaveBeenCalledWith(mockUser.username);
+    beforeEach(() => {
+      deleteUserSpy = jest.spyOn(util, 'deleteUserByUsername');
     });
 
-    it('should return 404 if username not provided', async () => {
-      // Express automatically returns 404 for missing parameters when
-      // defined as required in the route
-      const response = await supertest(app).delete('/user/deleteUser/');
-      expect(response.status).toBe(404);
+    afterEach(() => {
+      deleteUserSpy.mockRestore();
     });
 
-    it('should delete the user', async () => {
-      deleteUserByUsernameSpy.mockResolvedValueOnce(mockSafeUser);
-
-      const response = await supertest(app).delete(`/user/deleteUser/${mockUser.username}`);
-
+    it('should delete user if exists', async () => {
+      deleteUserSpy.mockResolvedValueOnce(mockSafeUser);
+      const response = await supertest(app).delete(`/user/${mockUser.username}`);
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockUserJSONResponse);
     });
 
     it('should return 404 if user not found', async () => {
-      deleteUserByUsernameSpy.mockResolvedValueOnce({ error: 'User not found' });
-
-      const response = await supertest(app).delete(`/user/deleteUser/${mockUser.username}`);
-
+      deleteUserSpy.mockResolvedValueOnce({ error: 'User not found' });
+      const response = await supertest(app).delete(`/user/ghost`);
       expect(response.status).toBe(404);
+      expect(response.body).toEqual({ error: 'User not found' });
     });
+
+    it('should return 500 if deletion fails', async () => {
+      deleteUserSpy.mockResolvedValueOnce({ error: 'Failed to delete user' });
+      const response = await supertest(app).delete(`/user/${mockUser.username}`);
+      expect(response.status).toBe(500);
+      expect(response.body).toEqual({ error: 'Failed to delete user' });
+    });
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    jest.resetModules();
+  });
+
+  afterAll(async () => {
+    jest.restoreAllMocks();
+    await mongoose.disconnect();
   });
 });
