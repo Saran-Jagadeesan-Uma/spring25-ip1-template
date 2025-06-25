@@ -1,8 +1,5 @@
 import express, { Response, Router } from 'express';
-import {
-  UserRequest,
-  UserByUsernameRequest,
-} from '../types/types';
+import { UserRequest, UserByUsernameRequest } from '../types/types';
 import {
   deleteUserByUsername,
   getUserByUsername,
@@ -19,8 +16,12 @@ const userController = () => {
    */
   const isUserBodyValid = (req: UserRequest): boolean => {
     const { username, password } = req.body;
-    return typeof username === 'string' && typeof password === 'string' &&
-      username.trim().length > 0 && password.trim().length > 0;
+    return (
+      typeof username === 'string' &&
+      typeof password === 'string' &&
+      username.trim().length > 0 &&
+      password.trim().length > 0
+    );
   };
 
   /**

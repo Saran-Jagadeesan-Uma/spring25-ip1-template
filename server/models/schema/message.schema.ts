@@ -15,7 +15,7 @@ const messageSchema: Schema = new Schema(
     msgFrom: { type: String, required: true },
     msgDateTime: { type: Date, required: true },
   },
-  { collection: 'Message' }
+  { collection: 'Message' },
 );
 
 export default messageSchema;

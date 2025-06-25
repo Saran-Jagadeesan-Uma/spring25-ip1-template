@@ -163,13 +163,17 @@ describe('Test userController', () => {
     });
 
     it('should return 400 if username is missing', async () => {
-      const response = await supertest(app).patch('/user/reset-password').send({ password: 'newpass' });
+      const response = await supertest(app)
+        .patch('/user/reset-password')
+        .send({ password: 'newpass' });
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ error: 'Invalid user body' });
     });
 
     it('should return 400 if password is missing', async () => {
-      const response = await supertest(app).patch('/user/reset-password').send({ username: 'user1' });
+      const response = await supertest(app)
+        .patch('/user/reset-password')
+        .send({ username: 'user1' });
       expect(response.status).toBe(400);
       expect(response.body).toEqual({ error: 'Invalid user body' });
     });

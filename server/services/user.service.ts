@@ -61,13 +61,15 @@ export const deleteUserByUsername = async (username: string): Promise<UserRespon
 /**
  * Updates user information in the database.
  */
-export const updateUser = async (username: string, updates: Partial<User>): Promise<UserResponse> => {
+export const updateUser = async (
+  username: string,
+  updates: Partial<User>,
+): Promise<UserResponse> => {
   try {
-    const updatedUser = await UserModel.findOneAndUpdate(
-      { username },
-      updates,
-      { new: true, lean: true }
-    );
+    const updatedUser = await UserModel.findOneAndUpdate({ username }, updates, {
+      new: true,
+      lean: true,
+    });
     if (!updatedUser) return { error: 'User not found' };
     const { password, ...safeUser } = updatedUser;
     return safeUser as SafeUser;
