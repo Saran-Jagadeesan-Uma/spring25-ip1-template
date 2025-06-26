@@ -2,14 +2,22 @@ import UserModel from '../models/users.model';
 import { User, UserCredentials, UserResponse, SafeUser } from '../types/types';
 
 /**
+ * Utility to remove the `password` field from an object.
+ */
+const omitPassword = <T extends { password?: unknown }>(obj: T): Omit<T, 'password'> => {
+  const clone = { ...obj };
+  delete clone.password;
+  return clone;
+};
+
+/**
  * Saves a new user to the database.
  */
 export const saveUser = async (user: User): Promise<UserResponse> => {
   try {
     const createdUser = await UserModel.create(user);
-    const { password: _password, ...safeUser } = createdUser.toObject();
-    return safeUser as SafeUser;
-  } catch (error) {
+    return omitPassword(createdUser.toObject());
+  } catch {
     return { error: 'Could not save user' };
   }
 };
@@ -21,9 +29,8 @@ export const getUserByUsername = async (username: string): Promise<UserResponse>
   try {
     const user = await UserModel.findOne({ username }).lean();
     if (!user) return { error: 'User not found' };
-    const { password, ...safeUser } = user;
-    return safeUser as SafeUser;
-  } catch (error) {
+    return omitPassword(user);
+  } catch {
     return { error: 'Failed to retrieve user' };
   }
 };
@@ -37,9 +44,8 @@ export const loginUser = async (loginCredentials: UserCredentials): Promise<User
     if (!user || user.password !== loginCredentials.password) {
       return { error: 'Invalid username or password' };
     }
-    const { password, ...safeUser } = user;
-    return safeUser as SafeUser;
-  } catch (error) {
+    return omitPassword(user);
+  } catch {
     return { error: 'Login failed' };
   }
 };
@@ -51,9 +57,8 @@ export const deleteUserByUsername = async (username: string): Promise<UserRespon
   try {
     const deletedUser = await UserModel.findOneAndDelete({ username }).lean();
     if (!deletedUser) return { error: 'User not found' };
-    const { password, ...safeUser } = deletedUser;
-    return safeUser as SafeUser;
-  } catch (error) {
+    return omitPassword(deletedUser);
+  } catch {
     return { error: 'Failed to delete user' };
   }
 };
@@ -66,16 +71,12 @@ export const updateUser = async (
   updates: Partial<User>,
 ): Promise<UserResponse> => {
   try {
-    const updatedUser = await UserModel.findOneAndUpdate({ username }, updates, {
+    const updatedDoc = await UserModel.findOneAndUpdate({ username }, updates, {
       new: true,
-      lean: true,
     });
-    if (!updatedUser) return { error: 'User not found' };
-
-    const userObj = (updatedUser as any).toObject ? (updatedUser as any).toObject() : updatedUser;
-    const { password, ...safeUser } = userObj;
-    return safeUser as SafeUser;
-  } catch (error) {
+    if (!updatedDoc) return { error: 'User not found' };
+    return omitPassword(updatedDoc.toObject());
+  } catch {
     return { error: 'Failed to update user' };
   }
 };
