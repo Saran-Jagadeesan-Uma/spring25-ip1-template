@@ -1,5 +1,5 @@
 import UserModel from '../models/users.model';
-import { User, UserCredentials, UserResponse, SafeUser } from '../types/types';
+import { User, UserCredentials, UserResponse } from '../types/types';
 
 /**
  * Utility to remove the `password` field from an object.
