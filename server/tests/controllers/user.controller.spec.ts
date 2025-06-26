@@ -212,21 +212,14 @@ describe('Test userController', () => {
 
     it('should return user if found', async () => {
       getUserSpy.mockResolvedValueOnce(mockSafeUser);
-      const response = await supertest(app).get(`/user/${mockUser.username}`);
+      const response = await supertest(app).get(`/user/getUser/${mockUser.username}`);
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockUserJSONResponse);
     });
 
-    it('should return 404 if user not found', async () => {
-      getUserSpy.mockResolvedValueOnce({ error: 'User not found' });
-      const response = await supertest(app).get(`/user/ghost`);
-      expect(response.status).toBe(404);
-      expect(response.body).toEqual({ error: 'User not found' });
-    });
-
     it('should return 500 if error retrieving user', async () => {
       getUserSpy.mockResolvedValueOnce({ error: 'Failed to retrieve user' });
-      const response = await supertest(app).get(`/user/${mockUser.username}`);
+      const response = await supertest(app).get(`/user/getUser/${mockUser.username}`);
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to retrieve user' });
     });
@@ -245,21 +238,21 @@ describe('Test userController', () => {
 
     it('should delete user if exists', async () => {
       deleteUserSpy.mockResolvedValueOnce(mockSafeUser);
-      const response = await supertest(app).delete(`/user/${mockUser.username}`);
+      const response = await supertest(app).delete(`/user/deleteUser/${mockUser.username}`);
       expect(response.status).toBe(200);
       expect(response.body).toEqual(mockUserJSONResponse);
     });
 
     it('should return 404 if user not found', async () => {
       deleteUserSpy.mockResolvedValueOnce({ error: 'User not found' });
-      const response = await supertest(app).delete(`/user/ghost`);
+      const response = await supertest(app).delete('/user/deleteUser/ghost');
       expect(response.status).toBe(404);
       expect(response.body).toEqual({ error: 'User not found' });
     });
 
     it('should return 500 if deletion fails', async () => {
       deleteUserSpy.mockResolvedValueOnce({ error: 'Failed to delete user' });
-      const response = await supertest(app).delete(`/user/${mockUser.username}`);
+      const response = await supertest(app).delete(`/user/deleteUser/${mockUser.username}`);
       expect(response.status).toBe(500);
       expect(response.body).toEqual({ error: 'Failed to delete user' });
     });

@@ -28,7 +28,7 @@ describe('User model', () => {
     });
 
     it('should return error if save operation fails', async () => {
-      mockingoose(UserModel).toReturn(new Error('DB error'), 'create');
+      jest.spyOn(UserModel, 'create').mockRejectedValueOnce(new Error('DB error'));
       const result = await saveUser(user);
       expect(result).toEqual({ error: 'Could not save user' });
     });
@@ -36,15 +36,12 @@ describe('User model', () => {
 
   describe('getUserByUsername', () => {
     it('should return the matching user', async () => {
-      const mockedUser = {
-        toObject: () => ({
-          _id: user._id,
-          username: user.username,
-          password: user.password,
-          dateJoined: user.dateJoined,
-        }),
-      };
-      mockingoose(UserModel).toReturn(mockedUser, 'findOne');
+      mockingoose(UserModel).toReturn({
+        _id: user._id,
+        username: user.username,
+        password: user.password,
+        dateJoined: user.dateJoined,
+      }, 'findOne');
 
       const result = await getUserByUsername(user.username);
 
@@ -73,16 +70,12 @@ describe('User model', () => {
 
   describe('loginUser', () => {
     it('should return the user if authentication succeeds', async () => {
-      const mockedUser = {
+      mockingoose(UserModel).toReturn({
+        _id: user._id,
+        username: user.username,
         password: user.password,
-        toObject: () => ({
-          _id: user._id,
-          username: user.username,
-          password: user.password,
-          dateJoined: user.dateJoined,
-        }),
-      };
-      mockingoose(UserModel).toReturn(mockedUser, 'findOne');
+        dateJoined: user.dateJoined,
+      }, 'findOne');
 
       const credentials: UserCredentials = {
         username: user.username,
@@ -103,8 +96,13 @@ describe('User model', () => {
     });
 
     it('should return error if password is incorrect', async () => {
-      mockingoose(UserModel).toReturn({ ...user, password: 'differentPassword' }, 'findOne');
-      const result = await loginUser({ username: user.username, password: 'wrongPassword' });
+      mockingoose(UserModel).toReturn({
+        _id: user._id,
+        username: user.username,
+        password: 'wrongPassword',
+        dateJoined: user.dateJoined,
+      }, 'findOne');
+      const result = await loginUser({ username: user.username, password: 'differentPassword' });
       expect(result).toEqual({ error: 'Invalid username or password' });
     });
 
@@ -121,7 +119,11 @@ describe('User model', () => {
 
   describe('deleteUserByUsername', () => {
     it('should return the deleted user', async () => {
-      mockingoose(UserModel).toReturn(safeUser, 'findOneAndDelete');
+      mockingoose(UserModel).toReturn({
+        _id: user._id,
+        username: user.username,
+        dateJoined: user.dateJoined,
+      }, 'findOneAndDelete');
       const result = await deleteUserByUsername(user.username);
       expect(result).toMatchObject({
         username: user.username,
@@ -146,12 +148,25 @@ describe('User model', () => {
     const updates: Partial<User> = { password: 'newPassword' };
 
     it('should return the updated user', async () => {
-      mockingoose(UserModel).toReturn(safeUser, 'findOneAndUpdate');
+      mockingoose(UserModel).toReturn(
+        {
+          _id: user._id,
+          username: user.username,
+          dateJoined: user.dateJoined,
+          password: updates.password,
+        },
+        'findOneAndUpdate'
+      );
+
       const result = await updateUser(user.username, updates);
+
       expect(result).toMatchObject({
         username: user.username,
         dateJoined: user.dateJoined,
       });
+
+      expect(result).toHaveProperty('_id');
+      expect((result as any)._id).toBeDefined();
     });
 
     it('should return error if user not found', async () => {

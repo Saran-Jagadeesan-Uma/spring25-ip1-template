@@ -71,7 +71,9 @@ export const updateUser = async (
       lean: true,
     });
     if (!updatedUser) return { error: 'User not found' };
-    const { password, ...safeUser } = updatedUser;
+    
+    const userObj = (updatedUser as any).toObject ? (updatedUser as any).toObject() : updatedUser;
+    const { password, ...safeUser } = userObj;
     return safeUser as SafeUser;
   } catch (error) {
     return { error: 'Failed to update user' };

@@ -11,9 +11,6 @@ import {
 const userController = () => {
   const router: Router = express.Router();
 
-  /**
-   * Validates that the request body contains all required fields for a user.
-   */
   const isUserBodyValid = (req: UserRequest): boolean => {
     const { username, password } = req.body;
     return (
@@ -24,93 +21,99 @@ const userController = () => {
     );
   };
 
-  /**
-   * Handles the creation of a new user account.
-   */
   const createUser = async (req: UserRequest, res: Response): Promise<void> => {
     if (!isUserBodyValid(req)) {
       res.status(400).json({ error: 'Invalid user body' });
       return;
     }
 
-    const user = {
-      ...req.body,
-      dateJoined: new Date(),
-    };
-
+    const user = { ...req.body, dateJoined: new Date() };
     const response = await saveUser(user);
+
     if ('error' in response) {
-      res.status(400).json(response);
+      if (response.error === 'Username already exists') {
+        res.status(409).json(response);
+      } else {
+        res.status(500).json(response);
+      }
     } else {
       res.status(201).json(response);
     }
   };
 
-  /**
-   * Handles user login by validating credentials.
-   */
   const userLogin = async (req: UserRequest, res: Response): Promise<void> => {
     if (!isUserBodyValid(req)) {
-      res.status(400).json({ error: 'Invalid login credentials' });
+      res.status(400).json({ error: 'Invalid user body' });
       return;
     }
 
     const response = await loginUser(req.body);
+
     if ('error' in response) {
-      res.status(401).json(response);
+      if (response.error === 'Invalid username or password') {
+        res.status(401).json(response);
+      } else {
+        res.status(500).json(response);
+      }
     } else {
       res.status(200).json(response);
     }
   };
 
-  /**
-   * Retrieves a user by their username.
-   */
   const getUser = async (req: UserByUsernameRequest, res: Response): Promise<void> => {
     const response = await getUserByUsername(req.params.username);
+
     if ('error' in response) {
-      res.status(404).json(response);
+      if (response.error === 'User not found') {
+        res.status(404).json({ error: 'User not found' });
+      } else {
+        res.status(500).json(response);
+      }
     } else {
       res.status(200).json(response);
     }
   };
 
-  /**
-   * Deletes a user by their username.
-   */
   const deleteUser = async (req: UserByUsernameRequest, res: Response): Promise<void> => {
     const response = await deleteUserByUsername(req.params.username);
+
     if ('error' in response) {
-      res.status(404).json(response);
+      if (response.error === 'User not found') {
+        res.status(404).json(response);
+      } else {
+        res.status(500).json(response);
+      }
     } else {
       res.status(200).json(response);
     }
   };
 
-  /**
-   * Resets a user's password.
-   */
   const resetPassword = async (req: UserRequest, res: Response): Promise<void> => {
     const { username, password } = req.body;
+
     if (typeof username !== 'string' || typeof password !== 'string') {
-      res.status(400).json({ error: 'Invalid reset body' });
+      res.status(400).json({ error: 'Invalid user body' }); // changed from 'Invalid reset body'
       return;
     }
 
     const response = await updateUser(username, { password });
+
     if ('error' in response) {
-      res.status(404).json(response);
+      if (response.error === 'User not found') {
+        res.status(404).json(response);
+      } else {
+        res.status(500).json(response);
+      }
     } else {
       res.status(200).json(response);
     }
   };
 
-  // Register routes with appropriate HTTP methods and paths
-  router.post('/', createUser);
+  router.post('/register', createUser);
   router.post('/login', userLogin);
-  router.get('/:username', getUser);
-  router.delete('/:username', deleteUser);
-  router.patch('/reset', resetPassword);
+  router.get('/getUser/:username', getUser);
+  router.delete('/deleteUser/:username', deleteUser);
+  router.patch('/reset-password', resetPassword);
 
   return router;
 };
