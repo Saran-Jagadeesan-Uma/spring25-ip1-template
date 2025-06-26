@@ -7,7 +7,7 @@ import {
   updateUser,
 } from '../../services/user.service';
 import { SafeUser, User, UserCredentials } from '../../types/user';
-import { user, safeUser } from '../mockData.models';
+import { user } from '../mockData.models';
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const mockingoose = require('mockingoose');
@@ -178,7 +178,7 @@ describe('User model', () => {
       });
 
       expect(result).toHaveProperty('_id');
-      expect((result as any)._id).toBeDefined();
+      expect((result as User)._id).toBeDefined();
     });
 
     it('should return error if user not found', async () => {
