@@ -7,8 +7,9 @@ import { User, UserCredentials, UserResponse } from '../types/types';
 export const saveUser = async (user: User): Promise<UserResponse> => {
   try {
     const createdUser = await UserModel.create(user);
-    const { password, ...safeUser } = createdUser.toObject();
-    return safeUser;
+    const userObj = createdUser.toObject();
+    delete (user as Partial<typeof user>).password;
+    return userObj;
   } catch {
     return { error: 'Could not save user' };
   }
@@ -36,8 +37,8 @@ export const loginUser = async (loginCredentials: UserCredentials): Promise<User
     if (!user || user.password !== loginCredentials.password) {
       return { error: 'Invalid username or password' };
     }
-    const { password, ...safeUser } = user;
-    return safeUser;
+    delete (user as Partial<typeof user>).password;
+    return user;
   } catch {
     return { error: 'Login failed' };
   }
@@ -64,11 +65,9 @@ export const updateUser = async (
   updates: Partial<User>,
 ): Promise<UserResponse> => {
   try {
-    const updatedDoc = await UserModel.findOneAndUpdate(
-      { username },
-      updates,
-      { new: true }
-    ).select('-password');
+    const updatedDoc = await UserModel.findOneAndUpdate({ username }, updates, {
+      new: true,
+    }).select('-password');
 
     if (!updatedDoc) return { error: 'User not found' };
     return updatedDoc.toObject();
